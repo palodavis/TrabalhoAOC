@@ -1,0 +1,8 @@
+0;i;ld r0, 18
+4;i;ld r1, 1c
+8;i;add r2, r0, r1 
+c;i;addi r0, 20
+10;i;st r0, 20 
+14;i;hlt
+18;d;15
+1c;d;8
