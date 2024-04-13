@@ -1,8 +1,27 @@
-0;i;ld r0, 18
-4;i;ld r1, 1c
-8;i;add r2, r0, r1 
-c;i;addi r0, 20
-10;i;st r0, 20 
-14;i;hlt
-18;d;15
-1c;d;8
+0;i;ld r0, 7a
+4;i;ld r1, 7e
+8;i;ld r2, 82
+c;i;ld r3, 86
+10;i;ld r4, 8a
+14;i;ld r5, 8e
+18;i;ld r6, 92
+1c;i;ld r7, 96
+20;i;div r8, r3, r4
+24;i;sub r9, r6, r7
+28;i;mul r9, r9, r5
+2c;i;add r9, r9, r8
+30;i;add r0, r0, r9
+34;i;addi r1, 1
+38;i;cmp r1, r2
+3c;i;jle 20
+40;i;st r0, 7a
+44;i;st r1, 7e
+48;i;hlt
+7a;d;0
+7e;d;1
+82;d;a
+86;d;a
+8a;d;5
+8e;d;3
+92;d;2
+96;d;1

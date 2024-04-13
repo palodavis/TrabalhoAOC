@@ -3,21 +3,9 @@
 #include <string.h>
 
 //variaveis globais
-unsigned char memoria[154]; //enderecos da memoria
-unsigned int mbr; //ocupar toda memoria
-unsigned int mar = 0; 
-unsigned char ir; 
-
-unsigned char ro0; 
-unsigned char ro1; 
-unsigned char ro2; 
-
-unsigned int imm; 	
-unsigned int pc = 0;  
-unsigned char e, l, g; 
-
-//registradores de 4 bytes;
-unsigned int reg[16]; 
+unsigned char memoria[154], ir, ro0, ro1, ro2, e, l, g;
+unsigned int reg[16], mbr, mar, imm, pc = 0;
+unsigned char *pt; //Ponteiro de leitura do arquivo .txt
 
 /**
  * conjunto de instrucoes da CPU
@@ -32,7 +20,7 @@ unsigned int reg[16];
  * ro2 endereco do terceiro operando registrador da instrucao
  * reg[ro0], reg[ro1] , reg[ro2] registradores de proposito geral
 */
-void busca() {
+void buscaDecodificaExecuta() {
 	mar = pc;
 	mbr = memoria[mar++] << 8;
 	mbr = (mbr | memoria[mar++]) << 8;
@@ -40,111 +28,67 @@ void busca() {
 	mbr = mbr | memoria[mar++];
 	//opcode com os 5 bits mais significativos
 	ir = (mbr >> 27);
-	 
-	//mascara e deslocamento do registrador operando
-	/* ro0 = ((mbr & 0x07800000) >> 23); 	/**
-										* mbr:    1111 1111 1111 1111 1111 1111 1111 1111
-									 	* & ro0:  0000 0111 1000 0000 0000 0000 0000 0000
-										* masc:   0000 0111 1000 0000 0000 0000 0000 0000 
-										*/										
-	/* ro1 = (mbr & 0x00780000) >> 19; 	/** 
-										* mbr:    1111 1111 1111 1111 1111 1111 1111 1111
-										* & ro0:  0000 0000 0111 1000 0000 0000 0000 0000
-										* masc:   0000 0000 0111 1000 0000 0000 0000 0000 
-										*/	
-	/* ro2 = (mbr & 0x00078000) >> 15; */
-	
-	/*imm = (mbr & 0x007fffff);  /** 
-								*  mbr:   1111 1111 1111 1111 1111 1111 1111 1111
-								*  & imm  0000 0000 0111 1111 1111 1111 1111 1111
-								*    =    0000 0000 0111 1111 1111 1111 1111 1111 
-							   */
-	// mar = (mbr & 0x007fffff);
-	
+
 	if (ir == 0) { // hlt
-		//CPU nao faz nada, hlt, finalizar programa
-		exit(0);
+        printf("Programa encerrado pelo comando 'hlt' no arquivo de instruções.\n");
+		exit(0);//CPU nao faz nada, hlt, finalizar programa
 	} else if (ir == 1) { //nop
-		//apenas incrementar o PC
-		pc += 4;
-	}
-	
-	else if (ir >= 2 && ir <= 4){	
+		pc += 4;//apenas incrementar o PC
+	} else if (ir >= 2 && ir <= 4){
 		ro0 = ((mbr & 0x07800000) >> 23);
 		ro1 = (mbr &  0x00780000) >> 19;
-		
-		if (ir == 2) { //not 
-		// negar o registrador regX;
-			reg[ro0] = !reg[ro0];
+
+		if (ir == 2) { //not
+		    reg[ro0] = !reg[ro0];// negar o registrador regX;
 			pc += 4;
 		} else if (ir == 3) { //movr
-		// movimentar regX p/ regY
-			reg[ro0] = reg[ro1];
+			reg[ro0] = reg[ro1];// movimentar regX p/ regY
 			pc += 4;
 		}
 		else if (ir == 4) { //cmp
-		//comparar palavra no regX c/ palavra no regY
-			if (reg[ro0] == reg[ro1]){ 
+			if (reg[ro0] == reg[ro1]){//comparar palavra no regX c/ palavra no regY
 				e = 0x01;
-				pc += 4;
 			} else {
 				e = 0x00;
-				pc += 4;
 			}
-			
+
 			if (reg[ro0] < reg[ro1]){
 				l = 0x01;
-				pc += 4;
 			} else {
 				l = 0x00;
-				pc += 4;
 			}
-			
+
 			if (reg[ro0] > reg[ro1]){
 				g = 0x01;
-				pc += 4;
 			} else {
 				g = 0x00;
-				pc += 4;
 			}
+
+            pc += 4;
 		}
-	}
-	
-	// LDBO
-	else if ( ir == 5)
-	{
+	} else if ( ir == 5) { // LDBO
 		ro0 = ((mbr & 0x07800000) >> 23);
 		ro1 = (mbr &  0x00780000) >> 19;
-	    // Calcula o endereco de memoria baseado em M[Z] + reg[ro1]
-        mar = (mbr & 0x007fffff) + reg[ro1];
-        // Carrega o valor da memoria no endereco calculado para o registrador ro0
-        mbr = memoria[mar++] << 8;
+        mar = (mbr & 0x007fffff) + reg[ro1]; // Calcula o endereco de memoria baseado em M[Z] + reg[ro1]
+        mbr = memoria[mar++] << 8; // Carrega o valor da memoria no endereco calculado para o registrador ro0
 		mbr = (mbr | memoria[mar++]) << 8;
 		mbr = (mbr | memoria[mar++]) << 8;
 		mbr = mbr | memoria[mar++];
         reg[ro0] = mbr;
-        
+
         pc += 4;
-	}
-	// STBO
-	else if ( ir == 6)
-	{
+	} else if ( ir == 6) { // STBO
 		ro0 = ((mbr & 0x07800000) >> 23);
 		ro1 = (mbr &  0x00780000) >> 19;
-	    // Calcula o endereco de memoria baseado em M[Z] + reg[ro1]
-        mar = (mbr & 0x007fffff) + reg[ro1];
-        
-        // Armazena o valor do registrador ro0 na memoria no endereco calculado
-        mbr = reg[ro0];
-        memoria[mar++] = (mbr >> 24) && 0xff;
-        memoria[mar++] = (mbr >> 16) && 0xff;
-        memoria[mar++] = (mbr >> 8) && 0xff;
-        memoria[mar++] = mbr && 0xff;
-        
+        mar = (mbr & 0x007fffff) + reg[ro1]; // Calcula o endereco de memoria baseado em M[Z] + reg[ro1]
+        mbr = reg[ro0]; // Armazena o valor do registrador ro0 na memoria no endereco calculado
+        memoria[mar++] = (mbr >> 24) & 0xff;
+        memoria[mar++] = (mbr >> 16) & 0xff;
+        memoria[mar++] = (mbr >> 8) & 0xff;
+        memoria[mar++] = mbr & 0xff;
+
         pc += 4;
-	}
-	//operacoes logicas e aritmeticas
-	else if ( ir >= 7 & ir <= 13) { 
+	} else if ( ir >= 7 & ir <= 13) { //operacoes logicas e aritmeticas
 		ro0 = (mbr &  0x07800000) >> 23;
 		ro1 = (mbr &  0x00780000) >> 19;
 		ro2 = (mbr &  0x00078000) >> 15;
@@ -176,54 +120,46 @@ void busca() {
 			reg[ro0] = reg[ro1] ^ reg[ro2];
 			pc+=4;
 		}
-	}
-		
-	else if (ir >= 14 && ir <= 15) {
+	} else if (ir >= 14 && ir <= 15) {
 		ro0 = (mbr &  0x07800000) >> 23;
 		ro1 = (mbr &  0x780000) >> 19;
-		mar = (mbr & 0x007fffff); /** 
+		mar = (mbr & 0x007fffff); /**
 									*  mbr:   1111 1111 1111 1111 1111 1111 1111 1111
 									*  & mar  0000 0000 0111 1111 1111 1111 1111 1111
-									*    =    0000 0000 0111 1111 1111 1111 1111 1111 
+									*    =    0000 0000 0111 1111 1111 1111 1111 1111
 								  */
 		if (ir == 14) { //ld
 			mbr = memoria[mar++];
 			mbr = (mbr << 8) | memoria[mar++];
 			mbr = (mbr << 8) | memoria[mar++];
 			mbr = (mbr << 8) | memoria[mar++];
-			reg[ro0] = mbr;		
+			reg[ro0] = mbr;
 			pc += 4;
 		} else if (ir == 15) { //st
 			mbr = reg[ro0];
-			memoria[mar++] = (mbr >> 24) && 0xff;
-        	memoria[mar++] = (mbr >> 16) && 0xff;
-        	memoria[mar++] = (mbr >> 8) && 0xff;
-        	memoria[mar++] = mbr && 0xff;
+			memoria[mar++] = (mbr >> 24) & 0xff;
+        	memoria[mar++] = (mbr >> 16) & 0xff;
+        	memoria[mar++] = (mbr >> 8) & 0xff;
+        	memoria[mar++] = mbr & 0xff;
 			pc += 4;
 		}
-	}
-	
-	else if (ir == 16) { // movil
+	} else if (ir == 16) { // movil
 	  ro0 = (mbr & 0x07800000) >> 23; // obtem o registrador X
 	    imm = (mbr & 0x0000FFFF); // obtem os 16 bits menos significativos do imediato
 	    reg[ro0] = imm; // logo após atribui o valor de imm ao reg X
 		pc += 4;
-	}
-	
-	else if (ir == 17) { // movih
+	} else if (ir == 17) { // movih
 	    ro0 = (mbr & 0x07800000) >> 23; // obtem o registrador X
 	    imm = (mbr & 0x0000FFFF); // obtem os 16 bits menos significativos do imediato
 	    reg[ro0] = (reg[ro0] & 0x0000FFFF) | (imm << 16); //move os 16 bits menos significativos para parte superior regX
 		pc += 4;
-	}	
-
-	else if (ir >= 18 && ir <= 23) {
+	} else if (ir >= 18 && ir <= 23) {
 		ro0 = (mbr &  0x07800000) >> 23;
-		imm = (mbr & 0x007fffff); /** 
+		imm = (mbr & 0x007fffff); /**
 									*  mbr:   1111 1111 1111 1111 1111 1111 1111 1111
 									*  & imm  0000 0000 0111 1111 1111 1111 1111 1111
-									*    =    0000 0000 0111 1111 1111 1111 1111 1111 
-							   	  */	
+									*    =    0000 0000 0111 1111 1111 1111 1111 1111
+							   	  */
 		if (ir == 18) { //addi
 			reg[ro0] = (reg[ro0] + imm);
 			pc += 4;
@@ -243,62 +179,67 @@ void busca() {
 			reg[ro0] = (reg[ro0] >> imm);
 			pc += 4;
 		}
-	}
-	
-	// instrucoes de jump
-	else if (ir >= 24 && ir <= 30){
+	} else if (ir >= 24 && ir <= 30){ // instrucoes de jump
 		mar = (mbr & 0x007fffff);
-		
+
 		if (ir == 24) { //je
 			if (e == 0x01) {
 				pc = mar;
-			}
+			} else {
+                pc += 4;
+            }
 		} else if (ir == 25) { //jne
 			if (e == 0x00) {
 				pc = mar;
-			}
+			} else {
+                pc += 4;
+            }
 		} else if (ir == 26) { //jl
  			if (l == 0x01) {
 				pc = mar;
-			}
+			} else {
+                pc += 4;
+             }
 		} else if (ir == 27) { //jle
 			if (e == 0x01 || l == 0x01) {
 				pc = mar;
-			}
+			}else{
+                pc += 4;
+            }
 		} else if (ir == 28) { //jg
 			if (g == 0x01) {
 				pc = mar;
-			}
+			} else {
+                pc += 4;
+            }
 		} else if (ir == 29) { //jge
 			if (e == 0x01 || g == 0x01) {
 				pc = mar;
-			}
+			} else {
+                pc += 4;
+            }
 		} else if (ir == 30) { //jmp
 			pc = mar;
 		}
-	}		
+	}
 }
-
-//Ponteiro de leitura do arquivo .txt
-unsigned char *pt;
 
 /**
  * Aplica mascara e desloca bits a direita para pegar de 8 em 8 bits todos os bits
- * da variavel 32 bits 'valor' e atribuir em 4 posi��es na memoria RAM a partir da posicao
+ * da variavel 32 bits 'valor' e atribuir em 4 posicoes na memoria RAM a partir da posicao
  * definida em 'posInicial'
  * @param posInicial posicao inicial da memoria que sera preenchida ela e as 3 posteriores
  * @param valor valor inteiro sem sinal 32 bits para ser armazenado na memoria (vetor de char 8 bits)
  */
 void guardarValorParaMemoria(unsigned int posInicial, unsigned int valor){
-    //pega de 8 em 8 os bits da variavel valor (32 bits) e desloca para o inicio para ser convertido em char e armazenado em 4 posicoes
-    memoria[posInicial++] = (valor & 0xff000000) >> 24;
+    memoria[posInicial++] = (valor & 0xff000000) >> 24;//pega de 8 em 8 os bits da variavel valor (32 bits) e desloca para o inicio para ser convertido em char e armazenado em 4 posicoes
     memoria[posInicial++] = (valor & 0x00ff0000) >> 16;
     memoria[posInicial++] = (valor & 0x0000ff00) >> 8;
     memoria[posInicial]   = (valor & 0x000000ff);
 }
 
 /**
- * Preenche a memoria com o padr�o de mensagem que adiciona o opcode da instrucao nos primeiros 5 bits e completa com zero os demais
+ * Preenche a memoria com o padrao de mensagem que adiciona o opcode da instrucao nos primeiros 5 bits e completa com zero os demais
  *
  * @param opcode inteiro sem sinal representando os bits do opcode da instrucao
  * @param posicao posicao da memoria que deve ser salvo a palavra na memoria
@@ -318,7 +259,7 @@ void preencherMemoriaPrimeiroFormato(unsigned int opcode, unsigned int posicao){
  */
 void preencherMemoriaSegundoFormato(unsigned int opcode, unsigned int rX, unsigned int posicao){
     unsigned int valor = opcode << 27;//desloca o opcode para os 5 bits mais siginificativos que representam o opcode
-    valor = (rX << 23) | valor;//desloca o valor de rX para os 9 bits mais significativos que representar�o na variavel valor os 5 bits do opcode + 4 bits do rX
+    valor = (rX << 23) | valor;//desloca o valor de rX para os 9 bits mais significativos que representarao na variavel valor os 5 bits do opcode + 4 bits do rX
     guardarValorParaMemoria(posicao, valor);//guarda na memoria a palavra 32 bits
 }
 
@@ -408,7 +349,6 @@ void processarInstrucao(int mem){
 
     ponteiro = strtok(pt," ,");//divide a palavra de instrucao em pedacos divididos por , ou espaco
 
-//    for (ponteiro = strtok(pt, " ,"); ponteiro != NULL; ponteiro = strtok(NULL, " ,")) { }
     while(ponteiro){
         if(count == 0){
             strcpy(instrucao, ponteiro);
@@ -492,7 +432,7 @@ void processarInstrucao(int mem){
 
 /**
  * Busca pelo arquivo instrucoes.txt no mesmo diretorio do executavel e processa o arquivo
- * inserindo a instru��o na memoria caso seja uma linha de instru��o ou guardando o valor na memoria
+ * inserindo a instrucao na memoria caso seja uma linha de instrucao ou guardando o valor na memoria
  * caso seja uma palavra de dado
  */
 void processarArquivo(){
@@ -501,13 +441,13 @@ void processarArquivo(){
     FILE *arq;
     unsigned char tipo, linha[99];
     unsigned int count = 0;
-    arq = fopen("instrucao.txt", "r");
+    arq = fopen("instrucoes.txt", "r");
 
-    while (fgets(linha, sizeof(linha), arq) != NULL){// carrega linha por linha o conteudo do arquivo de instru��es na variavel linha
-        pt = strtok(linha, "; ");// quebra a linha em peda�os separando por espa�os ou ;
+    while (fgets(linha, sizeof(linha), arq) != NULL){// carrega linha por linha o conteudo do arquivo de instrucoes na variavel linha
+        pt = strtok(linha, "; ");// quebra a linha em pedacos separando por espacos ou ;
         index = (int)strtol(pt,NULL,16);// converte de hexadecimal para inteiro o valor do primeiro peda�o da linha (corresponde ao endere�o da memoria)
-        while(pt){// itera sobre os peda�os de uma linha
-            if(count == 1){//se contador 1 � o peda�o que contem o tipo do comando se � instru��o (i) ou dado (d)
+        while(pt){// itera sobre os pedacos de uma linha
+            if(count == 1){//se contador 1 for o pedaco que contem o tipo do comando se o instrucao (i) ou dado (d)
                 tipo = *pt;
             }else if(count == 2){//se contador 2 contem ou o valor pra ser guardado na memoria ou a instrucao para ser armazenado na memoria
                 if(tipo == 'd'){//verifica se o tipo do comando desta linha � de dado, caso seja deve armazenar na memoria
@@ -525,7 +465,7 @@ void processarArquivo(){
     }
 
     if (NULL == arq)
-        printf("Arquivo instrucoes.txt n�o encontrado.\n");
+        printf("Arquivo instrucoes.txt nao encontrado.\n");
     fclose(arq);
 }
 
@@ -533,43 +473,44 @@ void processarArquivo(){
  * limpa a tela do terminal e move cursor para o inicio
  */
 void limparTela() {
-    printf("\033[2J\033[H"); // Limpa a tela e move o cursor para o in�cio
+    printf("\033[2J\033[H"); // Limpa a tela e move o cursor para o inicio
 }
 
 /**
- *
+ * Interrompe a execucao do programa ate que Enter seja digitado, continuando a execucao e limpando a tela
+ * apos ser digitado Enter. Cancela a execucao se qualquer outro caracter seja digitado
  */
 void solicitaContinuar(){
     printf("\n\nDigite Enter para continuar (outra tecla para sair)...\n");
     int c = getchar();
-//    limparTela();
-    if (c != '\n') { // Se n�o for outro Enter, cancela a execu��o
-        printf("Programa encerrado.\n");
+    limparTela();
+    if (c != '\n') { // Se nao for outro Enter, cancela a execucao
+        printf("Programa encerrado pelo usuario.\n");
         exit(0);
     }
 }
 
 void imprimirRegistradores(){
     printf("                          Registradores                          \n");
-    printf("----------+----------+----------+----------+-------------------+\n");
-    printf(" PC: %x    | MBR: %x   | MAR: %x   | IMM: %x   | IR %x \n", pc, mbr, mar, imm, ir);
-    printf("----------+----------+----------+----------+--------+----------+\n");
-    printf(" E: %x     | L: %x     | G: %x     | RO0: %x   | RO1: %x |  RO2: %x\n", e, l, g, ro0, ro1, ro2);
-    printf("----------+----------+----------+------------------------------+\n");
-    printf(" REG01: %x | REG02: %x | REG03: %x | REG04: %x  \n", reg[0], reg[1], reg[2], reg[3]);
-    printf("----------+----------+----------+------------------------------+\n");
-    printf(" REG05: %x | REG06: %x | REG07: %x | REG08: %x \n", reg[4], reg[5], reg[6], reg[7]);
-    printf("----------+----------+----------+------------------------------+\n");
-    printf(" REG09: %x | REG10: %x | REG11: %x | REG12: %x  \n", reg[8], reg[9], reg[10], reg[11]);
-    printf("----------+----------+----------+------------------------------+\n");
-    printf(" REG13: %x | REG14: %x | REG15: %x | REG16: %x \n", reg[12], reg[13], reg[14], reg[15]);
-    printf("----------+----------+----------+------------------------------+\n");
+    printf("-----------+----------+---------------+---------------+-----------------+\n");
+    printf("| PC: %02x   | IR %02x    | MAR: %08x | MBR: %08x | IMM: %08x   | \n", pc, ir, mar, mbr, imm);
+    printf("-----------+----------+---------------+---------------------------------+\n");
+    printf("| E: %x     | L: %x     | G: %x          | RO0: %02x   | RO1: %02x |  RO2: %02x  |\n", e, l, g, ro0, ro1, ro2);
+    printf("------------------------------------------------------------------------+\n");
+    printf("| REG00: %08x | REG01: %08x | REG02: %08x | REG03: %08x |\n", reg[0], reg[1], reg[2], reg[3]);
+    printf("------------------+-----------------+-----------------+-----------------+\n");
+    printf("| REG04: %08x | REG05: %08x | REG06: %08x | REG07: %08x |\n", reg[4], reg[5], reg[6], reg[7]);
+    printf("------------------+-----------------+-----------------+-----------------+\n");
+    printf("| REG08: %08x | REG09: %08x | REG10: %08x | REG11: %08x |\n", reg[8], reg[9], reg[10], reg[11]);
+    printf("------------------+-----------------+-----------------+-----------------+\n");
+    printf("| REG12: %08x | REG13: %08x | REG14: %08x | REG15: %08x |\n", reg[12], reg[13], reg[14], reg[15]);
+    printf("------------------+-----------------+-----------------+-----------------+\n");
 }
 
 void imprimirMemoria(){
     printf("\n                           Memoria                           ");
    	unsigned int i;
-   	
+
     for(  i = 0; i < 154; i++) {
         if (i%11 == 0)//adiciona quebra de linha a cada 11 elementos
             printf("\n----------+---------+---------+---------+---------+---------+---------+---------+---------+---------+---------+\n|");
@@ -578,33 +519,24 @@ void imprimirMemoria(){
 }
 
 /**
- * Imprime no terminal uma logo feita em um arquivo 'ifg-logo.txt'
+ * Imprime no terminal uma logo feita em codigo ANSI
  */
 void imprimirLogo() {
-    FILE *arquivo;
-    char linha[90];
-
-    if ((arquivo = fopen("ifg-logo.txt", "r")) != NULL) {
-        while (fgets(linha, 90, arquivo) != NULL) {
-            printf("%s", linha);
-        }
-        printf("\n\n\n");
-        fclose(arquivo);
-    }
+    printf("\e[3mAlunos: Henrique Barros e Paulo David \e[0m \n");
+    printf("\n                                  \033[31m 100001  \033[32m 1010101  10101011\n                                \033[31m 001111001 \033[32m 1     0  1      1\n                                \033[31m 111000111 \033[32m 0     0  0      1\n                                  \033[31m 11111   \033[32m 1101011  11010101\n\n                                \033[32m 1010101  10101011\n                                 1     0  1      1\n                                 0     0  0      1\n                                 1101011  11010101 \n\n                                 1010101  10101011  01010101\n                                 1     0  1      1  1      1\n                                 0     0  0      1  0      1\n                                 1101011  11010101  11010101\n                \n                                 1010101  10101011\n                                 1     0  1      1\n                                 0     0  0      1\n                                 1101011  11010101\n\n\n            \033[0m 1  00     0   00000  001001  0  001000  0   1  001000  1000\n             0  0  1   0  100       0     0    1     1   0    0    0    0\n             0  0   0  0     100    1     0    1     0   0    0    0    0\n             0  0    111  11100     0     1    0      101     1     1000\n\n                     0000  0000  0001   0000 00000   0     0\n                     0     0     0   0  0    0   0  1 0    0\n                     0000  000   0    0 000  00000  0  1   1 \n                     0     0     0   0  0    0  0  110001  1 \n                     0     0001  0000   0000 0   0 0     0 0000");
 
     solicitaContinuar();
 }
 
 int main(){
     imprimirLogo();
-	
+
 	processarArquivo();
-	        
+
     while(1){
-    	busca();
+        buscaDecodificaExecuta();
         imprimirRegistradores();
         imprimirMemoria();
         solicitaContinuar();
     }
 }
-
